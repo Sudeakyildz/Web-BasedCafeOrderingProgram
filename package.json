@@ -1,0 +1,15 @@
+{
+  "name": "asil-kafe-api",
+  "version": "1.0.0",
+  "description": "Asil Kafe Sipariş Sistemi",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build:client": "cd client && npm install && npm run build"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "mysql2": "^3.6.5"
+  }
+}

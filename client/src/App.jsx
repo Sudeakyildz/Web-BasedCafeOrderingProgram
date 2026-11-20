@@ -7,6 +7,12 @@ import './App.css'
 
 export default function App() {
   const [orders, setOrders] = useState({})
+  const [notification, setNotification] = useState(null)
+
+  const showToast = (message, type = 'success') => {
+    setNotification({ message, type })
+    setTimeout(() => setNotification(null), 3500)
+  }
 
   const addToOrder = useCallback((itemName, price) => {
     setOrders((prev) => {
@@ -34,7 +40,7 @@ export default function App() {
 
   const submitOrder = useCallback(async () => {
     if (Object.keys(orders).length === 0) {
-      alert('Sipariş vermek için önce ürün ekleyin.')
+      showToast('Sipariş vermek için önce ürün ekleyin.', 'warning')
       return
     }
     const orderData = {
@@ -56,17 +62,34 @@ export default function App() {
       })
       if (!res.ok) throw new Error(await res.text())
       const data = await res.json()
-      alert(data.message || 'Sipariş başarıyla kaydedildi!')
+      showToast(data.message || 'Siparişiniz başarıyla alındı! Afiyet olsun.', 'success')
       clearOrder()
     } catch (err) {
       console.error(err)
-      alert('Bir hata oluştu.')
+      showToast('Sipariş gönderilirken bir hata oluştu.', 'error')
     }
   }, [orders, clearOrder])
+
+  const totalItemCount = Object.values(orders).reduce((sum, item) => sum + item.quantity, 0)
+  const totalAmount = Object.values(orders).reduce((sum, item) => sum + item.price * item.quantity, 0)
+
+  const scrollToOrder = () => {
+    const el = document.getElementById('order-section')
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
 
   return (
     <>
       <Header />
+      
+      {notification && (
+        <div className={`toast-notification toast-${notification.type}`}>
+          {notification.message}
+        </div>
+      )}
+
       <main className="main-content">
         <Menu onAddToOrder={addToOrder} />
         <Order
@@ -76,6 +99,17 @@ export default function App() {
           onSubmit={submitOrder}
         />
       </main>
+
+      {totalItemCount > 0 && (
+        <div className="mobile-cart-bar" onClick={scrollToOrder}>
+          <div className="mobile-cart-info">
+            <span className="mobile-cart-count">{totalItemCount} Ürün</span>
+            <span className="mobile-cart-total">{totalAmount}₺</span>
+          </div>
+          <span className="mobile-cart-btn">Sepete Git →</span>
+        </div>
+      )}
+
       <Footer />
     </>
   )

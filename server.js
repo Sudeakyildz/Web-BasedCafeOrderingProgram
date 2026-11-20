@@ -40,6 +40,17 @@ function getLocalIP() {
 // JSON verilerini almak için middleware
 app.use(express.json()); // Gelen isteklerde JSON verisini otomatik olarak ayrıştırır.
 
+// CORS middleware (farklı port veya cihazlardan erişim için)
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
 // React build varsa onu sun, yoksa public (eski statik)
 const clientBuild = path.join(__dirname, 'client', 'dist');
 if (fs.existsSync(clientBuild)) {
@@ -63,15 +74,25 @@ const pool = mysql.createPool({
 
 // API endpointleri
 
-// Veritabanından tüm verileri döndüren GET endpoint
+// Siparişleri ve detaylarını getiren GET endpoint
+app.get('/api/orders', async (req, res) => {
+    try {
+        const [orders] = await pool.query('SELECT * FROM orders ORDER BY createdAt DESC LIMIT 50');
+        res.json(orders);
+    } catch (err) {
+        console.error('GET orders hatası:', err.message);
+        res.status(500).json({ error: 'Veritabanı bağlantısı yok veya sorgu başarısız' });
+    }
+});
+
+// Eski endpoint uyumluluğu için (opsiyonel)
 app.get('/api/data', async (req, res) => {
     try {
-        const [rows] = await pool.query('SELECT * FROM your_table'); 
-        // Veritabanından tüm veriler sorgulanır.
-        res.json(rows); // Sonuçlar JSON formatında istemciye gönderilir.
+        const [rows] = await pool.query('SELECT * FROM orders ORDER BY createdAt DESC LIMIT 50'); 
+        res.json(rows);
     } catch (err) {
-        console.error('GET isteği hatası:', err); // Hata konsola yazılır.
-        res.status(500).send('Sunucu hatası'); // Sunucu hatası mesajı döndürülür.
+        console.error('GET isteği hatası:', err.message);
+        res.json({ message: 'MySQL bağlantısı kurulmadı, veriler yerel modda işleniyor.' });
     }
 });
 

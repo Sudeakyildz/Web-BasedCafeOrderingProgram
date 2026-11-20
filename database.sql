@@ -1,6 +1,6 @@
 -- Asil Kafe sipariş tabloları
--- MySQL'de veritabanı oluşturduktan sonra bu dosyayı çalıştırın.
 -- Örnek: mysql -u root -p < database.sql
+-- (Sunucu açılışta tabloları kendisi de oluşturur/yükseltir.)
 
 CREATE DATABASE IF NOT EXISTS asil_kafe;
 USE asil_kafe;
@@ -8,7 +8,9 @@ USE asil_kafe;
 -- Sipariş başlığı (her sipariş için 1 satır)
 CREATE TABLE IF NOT EXISTS orders (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  tableNo INT NOT NULL DEFAULT 0,
   totalAmount DECIMAL(10,2) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'yeni', -- yeni | hazirlaniyor | hazir | teslim_edildi
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -21,6 +23,3 @@ CREATE TABLE IF NOT EXISTS order_items (
   totalPrice DECIMAL(10,2) NOT NULL,
   FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE
 );
-
--- Bağlantı için .env dosyasında DB_USER, DB_PASSWORD, DB_NAME ayarlayın
--- veya server.js varsayılanları kullanır (root, boş şifre, asil_kafe).

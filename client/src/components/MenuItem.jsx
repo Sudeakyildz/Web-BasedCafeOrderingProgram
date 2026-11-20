@@ -9,7 +9,7 @@ export default function MenuItem({ item, onAdd }) {
       <button 
         type="button" 
         className="btn-add" 
-        onClick={() => onAdd(item.name, item.price)}
+        onClick={() => onAdd(item.id)}
       >
         + Ekle
       </button>

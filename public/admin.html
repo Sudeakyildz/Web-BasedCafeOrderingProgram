@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personel Paneli - Asil Kafe</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 1rem; background: #1C2025; color: #F5F5F5; }
+    h1 { color: #FFD700; margin: 0 0 1rem; }
+    #bar { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+    input, button, select { padding: .5rem .8rem; border-radius: 6px; border: 1px solid #444; background: #282C34; color: #F5F5F5; font-size: 1rem; }
+    button { cursor: pointer; background: #FFD700; color: #1C2025; border: none; font-weight: bold; }
+    #msg { color: #ff8a80; min-height: 1.2rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+    .card { background: #282C34; border-radius: 10px; padding: 1rem; border-left: 5px solid #FFD700; }
+    .card.hazirlaniyor { border-color: #ffa726; }
+    .card.hazir { border-color: #66bb6a; }
+    .card.teslim_edildi { border-color: #666; opacity: .6; }
+    .card h2 { margin: 0 0 .3rem; font-size: 1.2rem; }
+    .meta { color: #aaa; font-size: .85rem; margin-bottom: .5rem; }
+    ul { padding-left: 1.2rem; margin: .5rem 0; }
+    .total { font-weight: bold; color: #FFD700; }
+  </style>
+</head>
+<body>
+  <h1>☕ Personel Paneli</h1>
+  <div id="bar">
+    <input id="token" type="password" placeholder="Admin token (varsa)" autocomplete="off">
+    <button id="save" type="button">Bağlan</button>
+    <label><input id="hideDone" type="checkbox" checked> Teslim edilenleri gizle</label>
+  </div>
+  <p id="msg"></p>
+  <div id="orders" class="grid"></div>
+
+<script>
+const STATUS_LABEL = { yeni: 'Yeni', hazirlaniyor: 'Hazırlanıyor', hazir: 'Hazır', teslim_edildi: 'Teslim edildi' };
+const NEXT = { yeni: 'hazirlaniyor', hazirlaniyor: 'hazir', hazir: 'teslim_edildi' };
+const tokenInput = document.getElementById('token');
+const msg = document.getElementById('msg');
+const list = document.getElementById('orders');
+const hideDone = document.getElementById('hideDone');
+
+try { tokenInput.value = sessionStorage.getItem('adminToken') || ''; } catch (e) {}
+
+function headers() {
+  return { 'Content-Type': 'application/json', 'X-Admin-Token': tokenInput.value };
+}
+
+async function load() {
+  try {
+    const res = await fetch('/api/orders', { headers: headers() });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      msg.textContent = d.error || 'Siparişler alınamadı.';
+      return;
+    }
+    msg.textContent = '';
+    render(await res.json());
+  } catch (e) {
+    msg.textContent = 'Sunucuya ulaşılamıyor.';
+  }
+}
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+
+function render(orders) {
+  list.replaceChildren();
+  for (const o of orders) {
+    if (hideDone.checked && o.status === 'teslim_edildi') continue;
+    const card = el('div', 'card ' + o.status);
+    card.appendChild(el('h2', '', 'Masa ' + o.tableNo + ' — #' + o.id));
+    const t = new Date(o.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    card.appendChild(el('div', 'meta', t + ' · ' + (STATUS_LABEL[o.status] || o.status)));
+    const ul = el('ul');
+    for (const it of o.items) ul.appendChild(el('li', '', it.quantity + ' × ' + it.itemName));
+    card.appendChild(ul);
+    card.appendChild(el('div', 'total', o.totalAmount + '₺'));
+    if (NEXT[o.status]) {
+      const b = el('button', '', '→ ' + STATUS_LABEL[NEXT[o.status]]);
+      b.style.marginTop = '.6rem';
+      b.addEventListener('click', async () => {
+        const res = await fetch('/api/orders/' + o.id + '/status', {
+          method: 'PATCH', headers: headers(), body: JSON.stringify({ status: NEXT[o.status] }),
+        });
+        if (!res.ok) msg.textContent = 'Durum güncellenemedi.';
+        load();
+      });
+      card.appendChild(b);
+    }
+    list.appendChild(card);
+  }
+  if (!list.children.length) list.appendChild(el('p', 'meta', 'Aktif sipariş yok.'));
+}
+
+document.getElementById('save').addEventListener('click', () => {
+  try { sessionStorage.setItem('adminToken', tokenInput.value); } catch (e) {}
+  load();
+});
+hideDone.addEventListener('change', load);
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>

@@ -1,99 +1,132 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import Header from './components/Header'
 import Menu from './components/Menu'
 import Order from './components/Order'
 import Footer from './components/Footer'
 import './App.css'
 
+function tableFromUrl() {
+  const m = new URLSearchParams(window.location.search).get('masa')
+  return m && /^\d{1,3}$/.test(m) ? m : ''
+}
+
 export default function App() {
+  const [menu, setMenu] = useState([])
+  const [menuError, setMenuError] = useState(false)
+  // orders: { [itemId]: quantity }
   const [orders, setOrders] = useState({})
+  const [tableNo, setTableNo] = useState(tableFromUrl)
+  const [submitting, setSubmitting] = useState(false)
   const [notification, setNotification] = useState(null)
+  const toastTimer = useRef(null)
 
-  const showToast = (message, type = 'success') => {
-    setNotification({ message, type })
-    setTimeout(() => setNotification(null), 3500)
-  }
-
-  const addToOrder = useCallback((itemName, price) => {
-    setOrders((prev) => {
-      const next = { ...prev }
-      if (next[itemName]) {
-        next[itemName].quantity += 1
-      } else {
-        next[itemName] = { price, quantity: 1 }
-      }
-      return next
-    })
+  useEffect(() => {
+    fetch('/api/menu')
+      .then((res) => {
+        if (!res.ok) throw new Error('menu')
+        return res.json()
+      })
+      .then(setMenu)
+      .catch(() => setMenuError(true))
   }, [])
 
-  const updateOrder = useCallback((itemName, change) => {
+  useEffect(() => () => clearTimeout(toastTimer.current), [])
+
+  const showToast = useCallback((message, type = 'success') => {
+    clearTimeout(toastTimer.current)
+    setNotification({ message, type })
+    toastTimer.current = setTimeout(() => setNotification(null), 3500)
+  }, [])
+
+  const itemsById = useMemo(() => {
+    const map = {}
+    for (const cat of menu) for (const item of cat.items) map[item.id] = item
+    return map
+  }, [menu])
+
+  // Sepet satırları: fiyat bilgisi menüden okunur
+  const lines = useMemo(
+    () =>
+      Object.entries(orders)
+        .filter(([id]) => itemsById[id])
+        .map(([id, quantity]) => ({ ...itemsById[id], quantity })),
+    [orders, itemsById]
+  )
+
+  const addToOrder = useCallback((id) => {
+    setOrders((prev) => ({ ...prev, [id]: (prev[id] || 0) + 1 }))
+  }, [])
+
+  const updateOrder = useCallback((id, change) => {
     setOrders((prev) => {
+      if (!prev[id]) return prev
       const next = { ...prev }
-      if (!next[itemName]) return next
-      next[itemName].quantity += change
-      if (next[itemName].quantity <= 0) delete next[itemName]
+      const qty = prev[id] + change
+      if (qty <= 0) delete next[id]
+      else next[id] = Math.min(qty, 50)
       return next
     })
   }, [])
 
   const clearOrder = useCallback(() => setOrders({}), [])
 
+  const totalItemCount = lines.reduce((sum, l) => sum + l.quantity, 0)
+  const totalAmount = lines.reduce((sum, l) => sum + l.price * l.quantity, 0)
+
   const submitOrder = useCallback(async () => {
-    if (Object.keys(orders).length === 0) {
+    if (lines.length === 0) {
       showToast('Sipariş vermek için önce ürün ekleyin.', 'warning')
       return
     }
-    const orderData = {
-      orderItems: Object.entries(orders).map(([itemName, { price, quantity }]) => ({
-        itemName,
-        quantity,
-        totalPrice: price * quantity,
-      })),
-      totalAmount: Object.values(orders).reduce(
-        (sum, { price, quantity }) => sum + price * quantity,
-        0
-      ),
+    const table = Number(tableNo)
+    if (!Number.isInteger(table) || table < 1 || table > 999) {
+      showToast('Lütfen geçerli bir masa numarası girin.', 'warning')
+      return
     }
+    setSubmitting(true)
     try {
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderData),
+        body: JSON.stringify({
+          tableNo: table,
+          items: lines.map((l) => ({ id: l.id, quantity: l.quantity })),
+        }),
       })
-      if (!res.ok) throw new Error(await res.text())
-      const data = await res.json()
-      showToast(data.message || 'Siparişiniz başarıyla alındı! Afiyet olsun.', 'success')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Sipariş gönderilemedi.')
+      showToast(data.message || 'Siparişiniz alındı! Afiyet olsun.', 'success')
       clearOrder()
     } catch (err) {
       console.error(err)
-      showToast('Sipariş gönderilirken bir hata oluştu.', 'error')
+      showToast(err.message || 'Sipariş gönderilirken bir hata oluştu.', 'error')
+    } finally {
+      setSubmitting(false)
     }
-  }, [orders, clearOrder])
-
-  const totalItemCount = Object.values(orders).reduce((sum, item) => sum + item.quantity, 0)
-  const totalAmount = Object.values(orders).reduce((sum, item) => sum + item.price * item.quantity, 0)
+  }, [lines, tableNo, showToast, clearOrder])
 
   const scrollToOrder = () => {
     const el = document.getElementById('order-section')
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' })
-    }
+    if (el) el.scrollIntoView({ behavior: 'smooth' })
   }
 
   return (
     <>
       <Header />
-      
+
       {notification && (
-        <div className={`toast-notification toast-${notification.type}`}>
+        <div className={`toast-notification toast-${notification.type}`} role="status">
           {notification.message}
         </div>
       )}
 
       <main className="main-content">
-        <Menu onAddToOrder={addToOrder} />
+        <Menu menu={menu} error={menuError} onAddToOrder={addToOrder} />
         <Order
-          orders={orders}
+          lines={lines}
+          tableNo={tableNo}
+          onTableChange={setTableNo}
+          submitting={submitting}
           onUpdate={updateOrder}
           onClear={clearOrder}
           onSubmit={submitOrder}
@@ -101,13 +134,13 @@ export default function App() {
       </main>
 
       {totalItemCount > 0 && (
-        <div className="mobile-cart-bar" onClick={scrollToOrder}>
-          <div className="mobile-cart-info">
+        <button type="button" className="mobile-cart-bar" onClick={scrollToOrder}>
+          <span className="mobile-cart-info">
             <span className="mobile-cart-count">{totalItemCount} Ürün</span>
             <span className="mobile-cart-total">{totalAmount}₺</span>
-          </div>
+          </span>
           <span className="mobile-cart-btn">Sepete Git →</span>
-        </div>
+        </button>
       )}
 
       <Footer />

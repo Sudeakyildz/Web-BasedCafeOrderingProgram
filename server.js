@@ -12,6 +12,7 @@ const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 const CORS_ORIGIN = process.env.CORS_ORIGIN || ''; // boşsa sadece aynı origin
 
 const STATUSES = ['yeni', 'hazirlaniyor', 'hazir', 'teslim_edildi'];
+const PAYMENT_METHODS = ['nakit', 'kart'];
 const MAX_TABLE = 999;
 const MAX_QTY = 50;
 const MAX_LINES = 30;
@@ -67,10 +68,10 @@ const memory = { seq: 0, orders: [] };
 function memoryStore() {
     return {
         mode: 'memory',
-        async createOrder({ tableNo, totalAmount, lines }) {
+        async createOrder({ tableNo, paymentMethod, totalAmount, lines }) {
             const id = ++memory.seq;
             memory.orders.unshift({
-                id, tableNo, totalAmount, status: 'yeni',
+                id, tableNo, paymentMethod, totalAmount, status: 'yeni',
                 createdAt: new Date().toISOString(),
                 items: lines.map((l) => ({ ...l })),
             });
@@ -93,6 +94,7 @@ async function ensureSchema(pool) {
     await pool.query(`CREATE TABLE IF NOT EXISTS orders (
         id INT AUTO_INCREMENT PRIMARY KEY,
         tableNo INT NOT NULL DEFAULT 0,
+        paymentMethod VARCHAR(20) NOT NULL DEFAULT 'nakit',
         totalAmount DECIMAL(10,2) NOT NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'yeni',
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -112,19 +114,20 @@ async function ensureSchema(pool) {
     );
     const have = new Set(cols.map((c) => c.COLUMN_NAME));
     if (!have.has('tableNo')) await pool.query('ALTER TABLE orders ADD COLUMN tableNo INT NOT NULL DEFAULT 0');
+    if (!have.has('paymentMethod')) await pool.query("ALTER TABLE orders ADD COLUMN paymentMethod VARCHAR(20) NOT NULL DEFAULT 'nakit'");
     if (!have.has('status')) await pool.query("ALTER TABLE orders ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'yeni'");
 }
 
 function mysqlStore(pool) {
     return {
         mode: 'mysql',
-        async createOrder({ tableNo, totalAmount, lines }) {
+        async createOrder({ tableNo, paymentMethod, totalAmount, lines }) {
             const conn = await pool.getConnection();
             try {
                 await conn.beginTransaction();
                 const [r] = await conn.query(
-                    'INSERT INTO orders (tableNo, totalAmount) VALUES (?, ?)',
-                    [tableNo, totalAmount]
+                    'INSERT INTO orders (tableNo, paymentMethod, totalAmount) VALUES (?, ?, ?)',
+                    [tableNo, paymentMethod, totalAmount]
                 );
                 const rows = lines.map((l) => [r.insertId, l.itemName, l.quantity, l.totalPrice]);
                 await conn.query(
@@ -142,7 +145,7 @@ function mysqlStore(pool) {
         },
         async listOrders(limit) {
             const [orders] = await pool.query(
-                'SELECT id, tableNo, totalAmount, status, createdAt FROM orders ORDER BY id DESC LIMIT ?',
+                'SELECT id, tableNo, paymentMethod, totalAmount, status, createdAt FROM orders ORDER BY id DESC LIMIT ?',
                 [limit]
             );
             if (orders.length === 0) return [];
@@ -265,10 +268,13 @@ app.get('/api/menu', (req, res) => res.json(menuCategories));
 
 // Sipariş doğrulama: fiyat daima sunucudaki menüden hesaplanır.
 function parseOrder(body) {
-    const { tableNo, items } = body || {};
+    const { tableNo, items, paymentMethod } = body || {};
     const table = Number(tableNo);
     if (!Number.isInteger(table) || table < 1 || table > MAX_TABLE) {
         return { error: `Geçerli bir masa numarası girin (1-${MAX_TABLE}).` };
+    }
+    if (!PAYMENT_METHODS.includes(paymentMethod)) {
+        return { error: 'Lütfen bir ödeme yöntemi seçin.' };
     }
     if (!Array.isArray(items) || items.length === 0 || items.length > MAX_LINES) {
         return { error: 'Sipariş boş veya çok uzun.' };
@@ -292,7 +298,7 @@ function parseOrder(body) {
         totalAmount += totalPrice;
         lines.push({ itemName: m.name, quantity, totalPrice });
     }
-    return { tableNo: table, totalAmount, lines };
+    return { tableNo: table, paymentMethod, totalAmount, lines };
 }
 
 app.post('/api/orders', rateLimit(20, 60 * 1000), async (req, res) => {

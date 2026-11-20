@@ -639,3 +639,37 @@ button:disabled {
   font-size: 1rem;
   text-align: center;
 }
+
+/* ================= ÖDEME YÖNTEMİ ================= */
+.payment-field {
+  border: none;
+  padding: 0;
+  margin: 0.8rem 0;
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+.payment-field legend {
+  float: left;
+  padding: 0;
+  margin-right: 0.6rem;
+}
+
+.payment-field label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  color: #f5f5f5;
+}
+
+.payment-field label.selected {
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.12);
+}

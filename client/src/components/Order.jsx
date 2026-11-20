@@ -2,6 +2,8 @@ export default function Order({
   lines,
   tableNo,
   onTableChange,
+  paymentMethod,
+  onPaymentChange,
   submitting,
   onUpdate,
   onClear,
@@ -30,6 +32,25 @@ export default function Order({
           placeholder="Örn. 5"
         />
       </label>
+
+      <fieldset className="payment-field">
+        <legend>Ödeme yöntemi</legend>
+        {[
+          ['nakit', 'Nakit'],
+          ['kart', 'Kart (masada)'],
+        ].map(([value, label]) => (
+          <label key={value} className={paymentMethod === value ? 'selected' : ''}>
+            <input
+              type="radio"
+              name="payment"
+              value={value}
+              checked={paymentMethod === value}
+              onChange={() => onPaymentChange(value)}
+            />
+            {label}
+          </label>
+        ))}
+      </fieldset>
 
       <ul id="orderList">
         {isEmpty ? (

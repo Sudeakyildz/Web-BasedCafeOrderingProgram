@@ -34,6 +34,7 @@
 
 <script>
 const STATUS_LABEL = { yeni: 'Yeni', hazirlaniyor: 'Hazırlanıyor', hazir: 'Hazır', teslim_edildi: 'Teslim edildi' };
+const PAY_LABEL = { nakit: 'Nakit', kart: 'Kart' };
 const NEXT = { yeni: 'hazirlaniyor', hazirlaniyor: 'hazir', hazir: 'teslim_edildi' };
 const tokenInput = document.getElementById('token');
 const msg = document.getElementById('msg');
@@ -75,7 +76,7 @@ function render(orders) {
     const card = el('div', 'card ' + o.status);
     card.appendChild(el('h2', '', 'Masa ' + o.tableNo + ' — #' + o.id));
     const t = new Date(o.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-    card.appendChild(el('div', 'meta', t + ' · ' + (STATUS_LABEL[o.status] || o.status)));
+    card.appendChild(el('div', 'meta', t + ' · ' + (STATUS_LABEL[o.status] || o.status) + ' · ' + (PAY_LABEL[o.paymentMethod] || o.paymentMethod)));
     const ul = el('ul');
     for (const it of o.items) ul.appendChild(el('li', '', it.quantity + ' × ' + it.itemName));
     card.appendChild(ul);

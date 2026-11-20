@@ -9,6 +9,7 @@ USE asil_kafe;
 CREATE TABLE IF NOT EXISTS orders (
   id INT AUTO_INCREMENT PRIMARY KEY,
   tableNo INT NOT NULL DEFAULT 0,
+  paymentMethod VARCHAR(20) NOT NULL DEFAULT 'nakit', -- nakit | kart
   totalAmount DECIMAL(10,2) NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'yeni', -- yeni | hazirlaniyor | hazir | teslim_edildi
   createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP

@@ -36,6 +36,7 @@ Siparişleri veritabanına kaydetmek için:
 - Her masanın QR kodu `http://<ip>:3000/?masa=5` gibi olmalı; masa numarası siparişe otomatik yazılır (müşteri elle de girebilir).
 - `/admin` sayfasında siparişler 5 saniyede bir yenilenir; durum: yeni → hazırlanıyor → hazır → teslim edildi.
 - `.env` içinde `ADMIN_TOKEN` ayarlarsanız panel bu anahtarla her cihazdan açılır; ayarlamazsanız yalnızca sunucu bilgisayarından.
+- Müşteri sipariş verirken ödeme yöntemini (nakit / kart, masada ödeme) seçer; panelde görünür. Online ödeme alınmaz.
 - Fiyatlar sunucudaki `data/menu.json` dosyasından hesaplanır; menüyü bu dosyadan düzenleyin.
 
 ## QR Kod

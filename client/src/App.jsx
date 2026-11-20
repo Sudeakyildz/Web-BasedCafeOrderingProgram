@@ -16,6 +16,7 @@ export default function App() {
   // orders: { [itemId]: quantity }
   const [orders, setOrders] = useState({})
   const [tableNo, setTableNo] = useState(tableFromUrl)
+  const [paymentMethod, setPaymentMethod] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [notification, setNotification] = useState(null)
   const toastTimer = useRef(null)
@@ -83,6 +84,10 @@ export default function App() {
       showToast('Lütfen geçerli bir masa numarası girin.', 'warning')
       return
     }
+    if (!paymentMethod) {
+      showToast('Lütfen bir ödeme yöntemi seçin.', 'warning')
+      return
+    }
     setSubmitting(true)
     try {
       const res = await fetch('/api/orders', {
@@ -90,6 +95,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tableNo: table,
+          paymentMethod,
           items: lines.map((l) => ({ id: l.id, quantity: l.quantity })),
         }),
       })
@@ -103,7 +109,7 @@ export default function App() {
     } finally {
       setSubmitting(false)
     }
-  }, [lines, tableNo, showToast, clearOrder])
+  }, [lines, tableNo, paymentMethod, showToast, clearOrder])
 
   const scrollToOrder = () => {
     const el = document.getElementById('order-section')
@@ -126,6 +132,8 @@ export default function App() {
           lines={lines}
           tableNo={tableNo}
           onTableChange={setTableNo}
+          paymentMethod={paymentMethod}
+          onPaymentChange={setPaymentMethod}
           submitting={submitting}
           onUpdate={updateOrder}
           onClear={clearOrder}
